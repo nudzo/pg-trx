@@ -1,9 +1,9 @@
 # Custom PostgreSQL with Extensions
 
-This repository contains a Dockerfile for building a custom PostgreSQL image with additional extensions pre-installed:
+This repository contains a production-ready, multi-stage Dockerfile for building a custom PostgreSQL 17.4 image with additional extensions pre-installed:
 
-- pgvector - for vector similarity search
-- TimescaleDB - for time-series data
+- pgvector (v0.8.0) - for vector similarity search capabilities
+- TimescaleDB (v2.19.3) - for time-series data management
 
 ## Features
 
@@ -12,12 +12,14 @@ This repository contains a Dockerfile for building a custom PostgreSQL image wit
 - Pre-configured with pgvector and TimescaleDB extensions
 - Extensions are automatically enabled on database initialization
 - Parametrized versions for easy updates
+- Fully compatible with the original PostgreSQL image
+- Semantic versioning for image tags
 
 ## Usage
 
 ### Build Locally
 
-To build the image locally:
+To build the image locally with default versions:
 
 ```bash
 docker build -t custom-postgres .
@@ -45,17 +47,69 @@ docker run -d \
 
 ### Verify Extensions
 
-Connect to the PostgreSQL instance and verify the extensions:
+The extensions are automatically enabled when the container starts. You can verify they are properly installed by connecting to the PostgreSQL instance and running:
 
 ```sql
 SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb');
 ```
 
+### Using with Docker Compose
+
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: ghcr.io/yourusername/pg-trx:17
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
 ## GitHub Actions
 
-This repository uses GitHub Actions to automatically build and publish the Docker image.
+This repository uses GitHub Actions to automatically build and publish the Docker image to GitHub Container Registry (GHCR).
 
-You can trigger a manual build with custom versions using the GitHub Actions UI.
+### Image Tagging
+
+The workflow creates several tags following semantic versioning principles:
+
+- `17` - Major version tag (used as the latest tag)
+- `17.4` - Full PostgreSQL version tag
+- `17.4-pgv0.8.0-tsdb2.19.3` - Full semantic version including all component versions
+- Additional tags for branches and pull requests
+
+### Manual Builds
+
+You can trigger a manual build with custom extension versions using the GitHub Actions UI. This allows specifying different versions of PostgreSQL, pgvector, and TimescaleDB.
+
+## Extension Details
+
+### pgvector
+
+pgvector adds vector similarity search to PostgreSQL for embeddings and other ML workloads. It provides:
+
+- Vector data type
+- L2 distance, inner product, and cosine distance operators
+- Exact and approximate nearest neighbor search
+
+### TimescaleDB
+
+TimescaleDB is a time-series database built as a PostgreSQL extension. It provides:
+
+- Automatic partitioning across time and space
+- Full SQL interface for time-series data
+- Optimized time-series queries and functions
+
+## Compatibility
+
+This image is designed to be a drop-in replacement for the official PostgreSQL image. All environment variables, volumes, and configuration options from the original PostgreSQL image work with this custom image.
 
 ## License
 
