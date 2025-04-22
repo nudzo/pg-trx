@@ -31,8 +31,11 @@ on:
         type: string
 
 env:
-  REGISTRY: ghcr.io
+  GHCR_REGISTRY: ghcr.io
+  GCR_REGISTRY: gcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # Fixed PostgreSQL version - if you change this, also update the Dockerfile
+  PG_VERSION: 17.4
 
 jobs:
   build:
@@ -48,41 +51,64 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Log in to the Container registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Log in to Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.GCR_REGISTRY }}
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+          
+      # Set versions from workflow inputs or defaults
+      - name: Set version parameters
+        id: version-params
+        run: |
+          # Use input for PostgreSQL version, or default from env
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.pg_version }}" ]]; then
+            echo "pg_version=${{ github.event.inputs.pg_version }}" >> $GITHUB_OUTPUT
+          else  
+            echo "pg_version=${{ env.PG_VERSION }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.GCR_REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version-params.outputs.pg_version }},enable={{is_default_branch}}
+            type=raw,value=${{ steps.versions.outputs.full_version_tag }},enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=short
 
-      - name: Determine versions
+      - name: Extract extension versions
         id: versions
         run: |
           # Use input from workflow_dispatch if available, otherwise use defaults from Dockerfile
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "pg_version=${{ github.event.inputs.pg_version }}" >> $GITHUB_OUTPUT
             echo "pgvector_version=${{ github.event.inputs.pgvector_version }}" >> $GITHUB_OUTPUT
             echo "timescaledb_version=${{ github.event.inputs.timescaledb_version }}" >> $GITHUB_OUTPUT
           else
             # Extract default values from Dockerfile
-            PG_VERSION=$(grep 'ARG PG_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
             PGVECTOR_VERSION=$(grep 'ARG PGVECTOR_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
             TIMESCALEDB_VERSION=$(grep 'ARG TIMESCALEDB_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
-            echo "pg_version=${PG_VERSION}" >> $GITHUB_OUTPUT
             echo "pgvector_version=${PGVECTOR_VERSION}" >> $GITHUB_OUTPUT
             echo "timescaledb_version=${TIMESCALEDB_VERSION}" >> $GITHUB_OUTPUT
           fi
+          
+          # Create a version tag with all components
+          FULL_VERSION_TAG="${{ steps.version-params.outputs.pg_version }}-pgv${PGVECTOR_VERSION}-tsdb${TIMESCALEDB_VERSION}"
+          echo "full_version_tag=${FULL_VERSION_TAG}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -94,7 +120,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            PG_VERSION=${{ steps.versions.outputs.pg_version }}
+            PG_VERSION=${{ steps.version-params.outputs.pg_version }}
             PGVECTOR_VERSION=${{ steps.versions.outputs.pgvector_version }}
             TIMESCALEDB_VERSION=${{ steps.versions.outputs.timescaledb_version }}
           

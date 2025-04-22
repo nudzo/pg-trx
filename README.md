@@ -59,4 +59,5 @@ You can trigger a manual build with custom versions using the GitHub Actions UI.
 
 ## License
 
-See the [LICENSE](LICENSE) file for details.
+See the [LICENSE](LICENSE) file for details for files in this repository.
+See [pgvector](https://github.com/pgvector/pgvector) and [TimescaleDB](https://github.com/timescale/timescaledb) for their respective licenses.
