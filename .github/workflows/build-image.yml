@@ -17,24 +17,24 @@ on:
       pg_version:
         description: 'PostgreSQL version'
         required: true
-        default: '17.5'
+        default: '17.7'
         type: string
       pgvector_version:
         description: 'pgvector version'
         required: true
-        default: '0.8.0'
+        default: '0.8.1'
         type: string
       timescaledb_version:
         description: 'TimescaleDB version'
         required: true
-        default: '2.20.3'
+        default: '2.23.1'
         type: string
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   # Fixed PostgreSQL version - if you change this, also update the Dockerfile
-  PG_VERSION: 17.5
+  PG_VERSION: 17.7
 
 jobs:
   build:
