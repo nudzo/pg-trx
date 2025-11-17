@@ -60,7 +60,7 @@ version: '3.8'
 
 services:
   db:
-    image: ghcr.io/yourusername/pg-trx:17
+    image: ghcr.io/nudzo/pg-trx:17
     environment:
       POSTGRES_PASSWORD: mysecretpassword
     ports:
