@@ -76,14 +76,41 @@ volumes:
 
 This repository uses GitHub Actions to automatically build and publish the Docker image to GitHub Container Registry (GHCR).
 
+### Multi-Architecture Support
+
+The images are built for multiple architectures to support different hardware platforms:
+
+- **linux/amd64** (Intel/AMD x86_64)
+- **linux/arm64** (ARM 64-bit, including Apple Silicon)
+
+Docker automatically selects the correct architecture when you pull an image using the standard tags.
+
 ### Image Tagging
 
 The workflow creates several tags following semantic versioning principles:
 
-- `17` - Major version tag (used as the latest tag)
-- `17.7` - Full PostgreSQL version tag
-- `17.7-pgv0.8.1-tsdb2.25.0` - Full semantic version including all component versions
-- Additional tags for branches and pull requests
+**Multi-architecture tags (recommended):**
+- `17` - Major version tag
+- `17.7` - Full PostgreSQL version tag  
+- `full-17.7-pgv0.8.1-tsdb2.25.0` - Full semantic version including all component versions
+- `latest` - Latest stable version
+
+**Architecture-specific tags:**
+- `17-amd64`, `17-arm64` - Major version for specific architecture
+- `17.7-amd64`, `17.7-arm64` - Full version for specific architecture
+- `full-17.7-pgv0.8.1-tsdb2.25.0-amd64`, `full-17.7-pgv0.8.1-tsdb2.25.0-arm64` - Full version for specific architecture
+- `latest-amd64`, `latest-arm64` - Latest version for specific architecture
+
+**Usage Examples:**
+
+```bash
+# Pull the multi-arch image (automatically selects your platform)
+docker pull ghcr.io/nudzo/pg-trx:17
+
+# Pull a specific architecture
+docker pull ghcr.io/nudzo/pg-trx:17-amd64
+docker pull ghcr.io/nudzo/pg-trx:17-arm64
+```
 
 ### Manual Builds
 
