@@ -21,6 +21,7 @@ This repository is a custom PostgreSQL image with pgvector and TimescaleDB exten
 - Image must include extensions initialization script.
 - Image must be functionally replaceable by original PostgreSQL image and vice versa.
 - Do not override original PostgreSQL image labels.
+- Image must be buildable for both amd64 and arm64 architectures. Tag each architecture separately, but also create a multi-arch manifest.
 
 ## Documentation
 
