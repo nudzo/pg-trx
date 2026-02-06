@@ -27,7 +27,7 @@ on:
       timescaledb_version:
         description: 'TimescaleDB version'
         required: true
-        default: '2.23.1'
+        default: '2.25.0'
         type: string
 
 env:

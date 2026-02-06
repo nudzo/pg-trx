@@ -3,7 +3,7 @@
 This repository contains a production-ready, multi-stage Dockerfile for building a custom PostgreSQL 17.7 image with additional extensions pre-installed:
 
 - pgvector (v0.8.1) - for vector similarity search capabilities
-- TimescaleDB (v2.23.1) - for time-series data management
+- TimescaleDB (v2.25.0) - for time-series data management
 
 ## Features
 
@@ -31,7 +31,7 @@ With custom versions:
 docker build \
   --build-arg PG_VERSION=17.7 \
   --build-arg PGVECTOR_VERSION=0.8.1 \
-  --build-arg TIMESCALEDB_VERSION=2.23.1 \
+  --build-arg TIMESCALEDB_VERSION=2.25.0 \
   -t custom-postgres .
 ```
 
@@ -82,7 +82,7 @@ The workflow creates several tags following semantic versioning principles:
 
 - `17` - Major version tag (used as the latest tag)
 - `17.7` - Full PostgreSQL version tag
-- `17.7-pgv0.8.1-tsdb2.23.1` - Full semantic version including all component versions
+- `17.7-pgv0.8.1-tsdb2.25.0` - Full semantic version including all component versions
 - Additional tags for branches and pull requests
 
 ### Manual Builds

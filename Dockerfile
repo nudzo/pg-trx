@@ -1,7 +1,7 @@
 # Define versions
 ARG PG_VERSION=17.7
 ARG PGVECTOR_VERSION=0.8.1
-ARG TIMESCALEDB_VERSION=2.23.1
+ARG TIMESCALEDB_VERSION=2.25.0
 
 # Custom PostgreSQL image with pgvector and TimescaleDB extensions
 # This Dockerfile implements a multi-stage build to minimize the final image size
