@@ -138,10 +138,11 @@ jobs:
           
           # Inspect the multi-arch manifest to get arch-specific digests
           echo "Inspecting multi-arch manifest..."
+          MANIFEST_OUTPUT=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}')
           
-          # Extract digests for each architecture using docker buildx imagetools inspect
-          AMD64_DIGEST=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}' | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest')
-          ARM64_DIGEST=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}' | jq -r '.manifests[] | select(.platform.architecture=="arm64") | .digest')
+          # Extract digests for each architecture from the manifest output
+          AMD64_DIGEST=$(echo "${MANIFEST_OUTPUT}" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest')
+          ARM64_DIGEST=$(echo "${MANIFEST_OUTPUT}" | jq -r '.manifests[] | select(.platform.architecture=="arm64") | .digest')
           
           # Validate that digests were found
           if [ -z "${AMD64_DIGEST}" ]; then
