@@ -115,6 +115,7 @@ jobs:
 
 
       - name: Build and push Docker image
+        id: build-and-push
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -128,6 +129,47 @@ jobs:
             PG_VERSION=${{ steps.version-params.outputs.pg_version }}
             PGVECTOR_VERSION=${{ steps.version-params.outputs.pgvector_version }}
             TIMESCALEDB_VERSION=${{ steps.version-params.outputs.timescaledb_version }}
+          
+      - name: Create architecture-specific tags
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          # Get the image reference from the main tag
+          IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}"
+          
+          # Inspect the multi-arch manifest to get arch-specific digests
+          echo "Inspecting multi-arch manifest..."
+          docker buildx imagetools inspect ${IMAGE_REF} --raw > /tmp/manifest.json
+          
+          # Extract digests for each architecture using docker buildx imagetools inspect
+          AMD64_DIGEST=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}' | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest')
+          ARM64_DIGEST=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}' | jq -r '.manifests[] | select(.platform.architecture=="arm64") | .digest')
+          
+          echo "AMD64 digest: ${AMD64_DIGEST}"
+          echo "ARM64 digest: ${ARM64_DIGEST}"
+          
+          # Create architecture-specific tags for major version
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}-arm64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
+          
+          # Create architecture-specific tags for full version
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_version }}-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_version }}-arm64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
+          
+          # Create architecture-specific tags for full version tag
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.full_version_tag }}-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.full_version_tag }}-arm64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
+          
+          # Create architecture-specific tags for latest
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
           
       - name: Image digest
         run: echo ${{ steps.build-and-push.outputs.digest }}
