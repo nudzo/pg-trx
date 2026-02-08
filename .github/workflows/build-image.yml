@@ -37,30 +37,19 @@ env:
   PG_VERSION: 17.7
 
 jobs:
-  build:
+  # Prepare version parameters used by all subsequent jobs
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      pg_version: ${{ steps.version-params.outputs.pg_version }}
+      pg_major_version: ${{ steps.version-params.outputs.pg_major_version }}
+      pgvector_version: ${{ steps.version-params.outputs.pgvector_version }}
+      timescaledb_version: ${{ steps.version-params.outputs.timescaledb_version }}
+      full_version_tag: ${{ steps.version-params.outputs.full_version_tag }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up QEMU for multi-architecture builds
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Set versions from workflow inputs or defaults
       - name: Set version parameters
         id: version-params
         run: |
@@ -70,26 +59,26 @@ jobs:
           else
             PG_VERSION="${{ env.PG_VERSION }}"
           fi
-          
+
           # Extract extension versions from Dockerfile or inputs
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.pgvector_version }}" ]]; then
             PGVECTOR_VERSION="${{ github.event.inputs.pgvector_version }}"
           else
             PGVECTOR_VERSION=$(grep 'ARG PGVECTOR_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
           fi
-          
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.timescaledb_version }}" ]]; then
             TIMESCALEDB_VERSION="${{ github.event.inputs.timescaledb_version }}"
           else
             TIMESCALEDB_VERSION=$(grep 'ARG TIMESCALEDB_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
           fi
-          
+
           # Extract major version for tags
           PG_MAJOR_VERSION=$(echo "${PG_VERSION}" | cut -d'.' -f1)
-          
+
           # Create full version tag
           FULL_VERSION_TAG="full-${PG_VERSION}-pgv${PGVECTOR_VERSION}-tsdb${TIMESCALEDB_VERSION}"
-          
+
           # Output all version information
           echo "pg_major_version=${PG_MAJOR_VERSION}" >> $GITHUB_OUTPUT
           echo "pg_version=${PG_VERSION}" >> $GITHUB_OUTPUT
@@ -97,53 +86,140 @@ jobs:
           echo "timescaledb_version=${TIMESCALEDB_VERSION}" >> $GITHUB_OUTPUT
           echo "full_version_tag=${FULL_VERSION_TAG}" >> $GITHUB_OUTPUT
 
+  # Build each architecture natively on a dedicated runner
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Prepare platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=build-${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=build-${{ env.PLATFORM_PAIR }},mode=max
+          build-args: |
+            PG_VERSION=${{ needs.prepare.outputs.pg_version }}
+            PGVECTOR_VERSION=${{ needs.prepare.outputs.pgvector_version }}
+            TIMESCALEDB_VERSION=${{ needs.prepare.outputs.timescaledb_version }}
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Merge per-platform digests into multi-arch manifest lists and push tags
+  merge:
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.version-params.outputs.pg_major_version }},enable={{is_default_branch}}
-            type=raw,value=${{ steps.version-params.outputs.pg_version }},enable={{is_default_branch}}
-            type=raw,value=${{ steps.version-params.outputs.full_version_tag }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.prepare.outputs.pg_major_version }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.prepare.outputs.pg_version }},enable={{is_default_branch}}
+            type=raw,value=${{ needs.prepare.outputs.full_version_tag }},enable={{is_default_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}},value=${{ steps.version-params.outputs.pg_version }}
-            type=semver,pattern={{major}},value=${{ steps.version-params.outputs.pg_version }}
+            type=semver,pattern={{version}},value=${{ needs.prepare.outputs.pg_version }}
+            type=semver,pattern={{major}},value=${{ needs.prepare.outputs.pg_version }}
 
+      - name: Create multi-arch manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
-
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            PG_VERSION=${{ steps.version-params.outputs.pg_version }}
-            PGVECTOR_VERSION=${{ steps.version-params.outputs.pgvector_version }}
-            TIMESCALEDB_VERSION=${{ steps.version-params.outputs.timescaledb_version }}
-          
       - name: Create architecture-specific tags
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
-          # Get the image reference from the main tag
-          IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}"
-          
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          MAIN_TAG="${{ needs.prepare.outputs.pg_major_version }}"
+
           # Inspect the multi-arch manifest to get arch-specific digests
           echo "Inspecting multi-arch manifest..."
-          MANIFEST_OUTPUT=$(docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .Manifest}}')
-          
-          # Extract digests for each architecture from the manifest output
+          MANIFEST_OUTPUT=$(docker buildx imagetools inspect ${IMAGE}:${MAIN_TAG} --format '{{json .Manifest}}')
+
+          # Extract digests for each architecture
           AMD64_DIGEST=$(echo "${MANIFEST_OUTPUT}" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest')
           ARM64_DIGEST=$(echo "${MANIFEST_OUTPUT}" | jq -r '.manifests[] | select(.platform.architecture=="arm64") | .digest')
-          
+
           # Validate that digests were found
           if [ -z "${AMD64_DIGEST}" ]; then
             echo "ERROR: AMD64 digest not found in manifest"
@@ -153,33 +229,19 @@ jobs:
             echo "ERROR: ARM64 digest not found in manifest"
             exit 1
           fi
-          
+
           echo "AMD64 digest: ${AMD64_DIGEST}"
           echo "ARM64 digest: ${ARM64_DIGEST}"
-          
-          # Create architecture-specific tags for major version
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_major_version }}-arm64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
-          
-          # Create architecture-specific tags for full version
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_version }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.pg_version }}-arm64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
-          
-          # Create architecture-specific tags for full version tag
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.full_version_tag }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version-params.outputs.full_version_tag }}-arm64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
-          
-          # Create architecture-specific tags for latest
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST}
-          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-arm64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
-          
-      - name: Image digest
-        run: echo ${{ steps.build-and-push.outputs.digest }}
+
+          # Create architecture-specific tags for all version variants
+          for TAG in "${{ needs.prepare.outputs.pg_major_version }}" \
+                     "${{ needs.prepare.outputs.pg_version }}" \
+                     "${{ needs.prepare.outputs.full_version_tag }}" \
+                     "latest"; do
+            docker buildx imagetools create -t ${IMAGE}:${TAG}-amd64 ${IMAGE}@${AMD64_DIGEST}
+            docker buildx imagetools create -t ${IMAGE}:${TAG}-arm64 ${IMAGE}@${ARM64_DIGEST}
+          done
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.pg_major_version }}
