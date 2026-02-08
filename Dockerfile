@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Clone and build pgvector
 WORKDIR /usr/src/pgvector
 RUN git clone --branch v${PGVECTOR_VERSION} --depth 1 https://github.com/pgvector/pgvector.git . \
-    && make \
+    && make OPTFLAGS="" \
     && make install
 
 # Stage 2: Build TimescaleDB extension
