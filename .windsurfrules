@@ -2,7 +2,7 @@
 
 ## Context
 
-This repository is a custom PostgreSQL image with pgvector and TimescaleDB extensions.
+This repository is a custom PostgreSQL image with pgvector, TimescaleDB and system_stats extensions.
 
 ## Rules
 

@@ -29,6 +29,11 @@ on:
         required: true
         default: '2.25.0'
         type: string
+      system_stats_version:
+        description: 'system_stats version'
+        required: true
+        default: '3.2'
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -45,6 +50,7 @@ jobs:
       pg_major_version: ${{ steps.version-params.outputs.pg_major_version }}
       pgvector_version: ${{ steps.version-params.outputs.pgvector_version }}
       timescaledb_version: ${{ steps.version-params.outputs.timescaledb_version }}
+      system_stats_version: ${{ steps.version-params.outputs.system_stats_version }}
       full_version_tag: ${{ steps.version-params.outputs.full_version_tag }}
     steps:
       - name: Checkout repository
@@ -73,17 +79,24 @@ jobs:
             TIMESCALEDB_VERSION=$(grep 'ARG TIMESCALEDB_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
           fi
 
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.system_stats_version }}" ]]; then
+            SYSTEM_STATS_VERSION="${{ github.event.inputs.system_stats_version }}"
+          else
+            SYSTEM_STATS_VERSION=$(grep 'ARG SYSTEM_STATS_VERSION=' Dockerfile | head -1 | cut -d'=' -f2)
+          fi
+
           # Extract major version for tags
           PG_MAJOR_VERSION=$(echo "${PG_VERSION}" | cut -d'.' -f1)
 
           # Create full version tag
-          FULL_VERSION_TAG="full-${PG_VERSION}-pgv${PGVECTOR_VERSION}-tsdb${TIMESCALEDB_VERSION}"
+          FULL_VERSION_TAG="full-${PG_VERSION}-pgv${PGVECTOR_VERSION}-tsdb${TIMESCALEDB_VERSION}-sysstat${SYSTEM_STATS_VERSION}"
 
           # Output all version information
           echo "pg_major_version=${PG_MAJOR_VERSION}" >> $GITHUB_OUTPUT
           echo "pg_version=${PG_VERSION}" >> $GITHUB_OUTPUT
           echo "pgvector_version=${PGVECTOR_VERSION}" >> $GITHUB_OUTPUT
           echo "timescaledb_version=${TIMESCALEDB_VERSION}" >> $GITHUB_OUTPUT
+          echo "system_stats_version=${SYSTEM_STATS_VERSION}" >> $GITHUB_OUTPUT
           echo "full_version_tag=${FULL_VERSION_TAG}" >> $GITHUB_OUTPUT
 
   # Build each architecture natively on a dedicated runner
@@ -142,6 +155,7 @@ jobs:
             PG_VERSION=${{ needs.prepare.outputs.pg_version }}
             PGVECTOR_VERSION=${{ needs.prepare.outputs.pgvector_version }}
             TIMESCALEDB_VERSION=${{ needs.prepare.outputs.timescaledb_version }}
+            SYSTEM_STATS_VERSION=${{ needs.prepare.outputs.system_stats_version }}
 
       - name: Export digest
         run: |
