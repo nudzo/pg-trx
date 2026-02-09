@@ -4,12 +4,13 @@ This repository contains a production-ready, multi-stage Dockerfile for building
 
 - pgvector (v0.8.1) - for vector similarity search capabilities
 - TimescaleDB (v2.25.0) - for time-series data management
+- system_stats (v3.2) - for system-level monitoring statistics
 
 ## Features
 
 - Based on the official PostgreSQL 17.7 image
 - Multi-stage build to minimize image size
-- Pre-configured with pgvector and TimescaleDB extensions
+- Pre-configured with pgvector, TimescaleDB and system_stats extensions
 - Extensions are automatically enabled on database initialization
 - Parametrized versions for easy updates
 - Fully compatible with the original PostgreSQL image
@@ -32,6 +33,7 @@ docker build \
   --build-arg PG_VERSION=17.7 \
   --build-arg PGVECTOR_VERSION=0.8.1 \
   --build-arg TIMESCALEDB_VERSION=2.25.0 \
+  --build-arg SYSTEM_STATS_VERSION=3.2 \
   -t custom-postgres .
 ```
 
@@ -50,7 +52,7 @@ docker run -d \
 The extensions are automatically enabled when the container starts. You can verify they are properly installed by connecting to the PostgreSQL instance and running:
 
 ```sql
-SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb');
+SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb', 'system_stats');
 ```
 
 ### Using with Docker Compose
@@ -92,13 +94,13 @@ The workflow creates several tags following semantic versioning principles:
 **Multi-architecture tags (recommended):**
 - `17` - Major version tag
 - `17.7` - Full PostgreSQL version tag  
-- `full-17.7-pgv0.8.1-tsdb2.25.0` - Full semantic version including all component versions
+- `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2` - Full semantic version including all component versions
 - `latest` - Latest stable version
 
 **Architecture-specific tags:**
 - `17-amd64`, `17-arm64` - Major version for specific architecture
 - `17.7-amd64`, `17.7-arm64` - Full version for specific architecture
-- `full-17.7-pgv0.8.1-tsdb2.25.0-amd64`, `full-17.7-pgv0.8.1-tsdb2.25.0-arm64` - Full version for specific architecture
+- `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2-amd64`, `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2-arm64` - Full version for specific architecture
 - `latest-amd64`, `latest-arm64` - Latest version for specific architecture
 
 **Usage Examples:**
@@ -114,7 +116,7 @@ docker pull ghcr.io/nudzo/pg-trx:17-arm64
 
 ### Manual Builds
 
-You can trigger a manual build with custom extension versions using the GitHub Actions UI. This allows specifying different versions of PostgreSQL, pgvector, and TimescaleDB.
+You can trigger a manual build with custom extension versions using the GitHub Actions UI. This allows specifying different versions of PostgreSQL, pgvector, TimescaleDB, and system_stats.
 
 ## Extension Details
 
@@ -134,6 +136,16 @@ TimescaleDB is a time-series database built as a PostgreSQL extension. It provid
 - Full SQL interface for time-series data
 - Optimized time-series queries and functions
 
+### system_stats
+
+system_stats is a PostgreSQL extension that provides functions to access system-level statistics for monitoring. It provides:
+
+- CPU, memory and disk usage information
+- I/O analysis of block devices
+- Network interface statistics
+- Process information and load averages
+- OS-level information
+
 ## Compatibility
 
 This image is designed to be a drop-in replacement for the official PostgreSQL image. All environment variables, volumes, and configuration options from the original PostgreSQL image work with this custom image.
@@ -141,4 +153,4 @@ This image is designed to be a drop-in replacement for the official PostgreSQL i
 ## License
 
 See the [LICENSE](LICENSE) file for details for files in this repository.
-See [pgvector](https://github.com/pgvector/pgvector) and [TimescaleDB](https://github.com/timescale/timescaledb) for their respective licenses.
+See [pgvector](https://github.com/pgvector/pgvector), [TimescaleDB](https://github.com/timescale/timescaledb) and [system_stats](https://github.com/EnterpriseDB/system_stats) for their respective licenses.

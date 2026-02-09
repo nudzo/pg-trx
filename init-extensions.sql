@@ -1,4 +1,4 @@
--- PostgreSQL initialization script for pgvector and TimescaleDB extensions
+-- PostgreSQL initialization script for pgvector, TimescaleDB and system_stats extensions
 -- This script runs automatically when a container is first started
 
 -- Enable pgvector extension for vector similarity search capabilities
@@ -9,6 +9,10 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- This adds time-series optimized tables and related functions
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
+-- Enable system_stats extension for system-level monitoring statistics
+-- This adds functions to access CPU, memory, disk, network and process information
+CREATE EXTENSION IF NOT EXISTS system_stats;
+
 -- Verification query to confirm extensions are properly installed
 -- This output will be visible in container logs during initialization
-SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb');
+SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'timescaledb', 'system_stats');
