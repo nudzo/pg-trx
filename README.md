@@ -1,6 +1,6 @@
 # Custom PostgreSQL with Extensions
 
-This repository contains a production-ready, multi-stage Dockerfile for building a custom PostgreSQL 17.7 image with additional extensions pre-installed:
+This repository contains a production-ready, multi-stage Dockerfile for building a custom PostgreSQL 17.8 image with additional extensions pre-installed:
 
 - pgvector (v0.8.1) - for vector similarity search capabilities
 - TimescaleDB (v2.25.0) - for time-series data management
@@ -8,7 +8,7 @@ This repository contains a production-ready, multi-stage Dockerfile for building
 
 ## Features
 
-- Based on the official PostgreSQL 17.7 image
+- Based on the official PostgreSQL 17.8 image
 - Multi-stage build to minimize image size
 - Pre-configured with pgvector, TimescaleDB and system_stats extensions
 - Extensions are automatically enabled on database initialization
@@ -30,7 +30,7 @@ With custom versions:
 
 ```bash
 docker build \
-  --build-arg PG_VERSION=17.7 \
+  --build-arg PG_VERSION=17.8 \
   --build-arg PGVECTOR_VERSION=0.8.1 \
   --build-arg TIMESCALEDB_VERSION=2.25.0 \
   --build-arg SYSTEM_STATS_VERSION=3.2 \
@@ -93,14 +93,14 @@ The workflow creates several tags following semantic versioning principles:
 
 **Multi-architecture tags (recommended):**
 - `17` - Major version tag
-- `17.7` - Full PostgreSQL version tag  
-- `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2` - Full semantic version including all component versions
+- `17.8` - Full PostgreSQL version tag  
+- `full-17.8-pgv0.8.1-tsdb2.25.0-sysstat3.2` - Full semantic version including all component versions
 - `latest` - Latest stable version
 
 **Architecture-specific tags:**
 - `17-amd64`, `17-arm64` - Major version for specific architecture
-- `17.7-amd64`, `17.7-arm64` - Full version for specific architecture
-- `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2-amd64`, `full-17.7-pgv0.8.1-tsdb2.25.0-sysstat3.2-arm64` - Full version for specific architecture
+- `17.8-amd64`, `17.8-arm64` - Full version for specific architecture
+- `full-17.8-pgv0.8.1-tsdb2.25.0-sysstat3.2-amd64`, `full-17.8-pgv0.8.1-tsdb2.25.0-sysstat3.2-arm64` - Full version for specific architecture
 - `latest-amd64`, `latest-arm64` - Latest version for specific architecture
 
 **Usage Examples:**

@@ -17,7 +17,7 @@ on:
       pg_version:
         description: 'PostgreSQL version'
         required: true
-        default: '17.7'
+        default: '17.8'
         type: string
       pgvector_version:
         description: 'pgvector version'
@@ -39,7 +39,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   # Fixed PostgreSQL version - if you change this, also update the Dockerfile
-  PG_VERSION: 17.7
+  PG_VERSION: 17.8
 
 jobs:
   # Prepare version parameters used by all subsequent jobs
