@@ -295,9 +295,10 @@ jobs:
             API_PATH="/user/packages/container/${PACKAGE}/versions"
           fi
 
-          # Retrieve every version together with its tag list
+          # Retrieve every version together with its tag list.
+          # Emit one object per line from gh and use jq -s to assemble a single array.
           ALL_VERSIONS=$(gh api --paginate "${API_PATH}" \
-            --jq '[.[] | {id: .id, tags: (.metadata.container.tags // [])}]')
+            --jq '.[] | {id: .id, tags: (.metadata.container.tags // [])}' | jq -s '.')
 
           # Collect distinct build-generation identifiers: full-* tags without an arch suffix.
           # sort -rV orders them newest-first using version-aware comparison.
