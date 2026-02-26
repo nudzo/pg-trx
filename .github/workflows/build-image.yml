@@ -27,7 +27,7 @@ on:
       timescaledb_version:
         description: 'TimescaleDB version'
         required: true
-        default: '2.25.0'
+        default: '2.25.1'
         type: string
       system_stats_version:
         description: 'system_stats version'
@@ -262,7 +262,7 @@ jobs:
 
   # Remove container versions older than the two most recent build generations to reclaim GHCR storage.
   # A "build generation" is identified by the unique full-version tag applied to the multi-arch manifest
-  # (e.g. full-17.8-pgv0.8.2-tsdb2.25.0-sysstat3.2). Arch-specific variants of that tag
+  # (e.g. full-17.8-pgv0.8.2-tsdb2.25.1-sysstat3.2). Arch-specific variants of that tag
   # (full-*-amd64 / full-*-arm64) are also cleaned up when the base generation is removed.
   # Versions that carry no full-* tag at all (PR/branch images, untagged layer blobs) are left alone.
   cleanup:

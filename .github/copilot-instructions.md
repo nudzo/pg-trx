@@ -33,7 +33,7 @@ When updating versions, change ARGs in Dockerfile (lines 2–4). The workflow ex
 ```dockerfile
 ARG PG_VERSION=17.7
 ARG PGVECTOR_VERSION=0.8.2
-ARG TIMESCALEDB_VERSION=2.25.0
+ARG TIMESCALEDB_VERSION=2.25.1
 ```
 
 When changing the PostgreSQL **major** version, also update all hardcoded paths in COPY statements and `postgresql-server-dev-*` package names (e.g., `/usr/lib/postgresql/17/lib/`, `postgresql-server-dev-17`).
@@ -64,7 +64,7 @@ docker exec <container> psql -U postgres -c "SELECT extname FROM pg_extension;"
 Tag each architecture separately **and** create a multi-arch manifest:
 - `17` — major version (also used as `latest`)
 - `17.7` — full PostgreSQL version
-- `full-17.7-pgv0.8.2-tsdb2.25.0` — complete version string with all components
+- `full-17.8-pgv0.8.2-tsdb2.25.1-sysstat3.2` — complete version string with all components
 - Architecture suffixes: `-amd64`, `-arm64` for platform-specific pulls
 
 ## Documentation Standards

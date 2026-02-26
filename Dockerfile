@@ -1,7 +1,7 @@
 # Define versions
 ARG PG_VERSION=17.8
 ARG PGVECTOR_VERSION=0.8.2
-ARG TIMESCALEDB_VERSION=2.25.0
+ARG TIMESCALEDB_VERSION=2.25.1
 ARG SYSTEM_STATS_VERSION=3.2
 
 # Custom PostgreSQL image with pgvector, TimescaleDB and system_stats extensions
