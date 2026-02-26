@@ -259,3 +259,101 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.pg_major_version }}
+
+  # Remove container versions older than the two most recent build generations to reclaim GHCR storage.
+  # A "build generation" is identified by the unique full-version tag applied to the multi-arch manifest
+  # (e.g. full-17.8-pgv0.8.2-tsdb2.25.0-sysstat3.2). Arch-specific variants of that tag
+  # (full-*-amd64 / full-*-arm64) are also cleaned up when the base generation is removed.
+  # Versions that carry no full-* tag at all (PR/branch images, untagged layer blobs) are left alone.
+  cleanup:
+    name: Clean up old container versions
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - merge
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old package versions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          OWNER="${{ github.repository_owner }}"
+          PACKAGE="${{ github.event.repository.name }}"
+          KEEP_GENERATIONS=2
+
+          # Select the correct REST endpoint depending on whether the owner is a user or an org
+          OWNER_TYPE=$(gh api "/users/${OWNER}" --jq '.type')
+          if [ "$OWNER_TYPE" = "Organization" ]; then
+            API_PATH="/orgs/${OWNER}/packages/container/${PACKAGE}/versions"
+          else
+            API_PATH="/user/packages/container/${PACKAGE}/versions"
+          fi
+
+          # Retrieve every version together with its tag list
+          ALL_VERSIONS=$(gh api --paginate "${API_PATH}" \
+            --jq '[.[] | {id: .id, tags: (.metadata.container.tags // [])}]')
+
+          # Collect distinct build-generation identifiers: full-* tags without an arch suffix.
+          # sort -rV orders them newest-first using version-aware comparison.
+          GENERATIONS=$(echo "$ALL_VERSIONS" | jq -r '
+            [.[].tags[]
+              | select(
+                  startswith("full-")
+                  and (endswith("-amd64") | not)
+                  and (endswith("-arm64") | not))
+            ] | unique | .[]
+          ' | sort -rV || true)
+
+          # Count non-empty lines; handles the case where GENERATIONS is empty
+          TOTAL=$(echo "$GENERATIONS" | awk 'NF { count++ } END { print count+0 }')
+          echo "Build generations found (${TOTAL}):"
+          [ -n "$GENERATIONS" ] && echo "$GENERATIONS" || echo "  (none)"
+
+          if [ "${TOTAL}" -le "${KEEP_GENERATIONS}" ]; then
+            echo "Only ${TOTAL} generation(s) present — nothing to clean up."
+            exit 0
+          fi
+
+          # The most recent KEEP_GENERATIONS entries are protected; everything else is old
+          KEEP_SET=$(echo "$GENERATIONS" | head -"${KEEP_GENERATIONS}")
+          echo "Retaining generations:"
+          echo "$KEEP_SET"
+
+          DELETED=0
+          while IFS= read -r V; do
+            VID=$(echo "$V" | jq -r '.id')
+            VTAGS=$(echo "$V" | jq -r '.tags[]' 2>/dev/null || true)
+
+            # Skip versions that carry no full-* tag at all
+            # (untagged layer blobs, PR/branch images, etc.)
+            echo "$VTAGS" | grep -q '^full-' || continue
+
+            # Delete only when ALL full-* base tags on the version belong to old generations.
+            # A single match against the keep set is enough to protect the version.
+            SHOULD_DELETE=true
+            while IFS= read -r T; do
+              [[ "$T" == full-* ]] || continue
+              # Strip architecture suffix to get the canonical generation identifier
+              BASE="${T%-amd64}"
+              BASE="${BASE%-arm64}"
+              if echo "$KEEP_SET" | grep -qxF "$BASE"; then
+                SHOULD_DELETE=false
+                break
+              fi
+            done <<< "$VTAGS"
+
+            if [ "$SHOULD_DELETE" = true ]; then
+              TAGS_CSV=$(echo "$VTAGS" | tr '\n' ',' | sed 's/,$//')
+              echo "Deleting version ${VID} (${TAGS_CSV})"
+              gh api --method DELETE "${API_PATH}/${VID}"
+              DELETED=$((DELETED + 1))
+            fi
+          done < <(echo "$ALL_VERSIONS" | jq -c '.[]')
+
+          echo "Cleanup complete. Deleted ${DELETED} old version(s)."
