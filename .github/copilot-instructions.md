@@ -32,7 +32,7 @@ Multi-stage Dockerfile building PostgreSQL with pgvector (vector similarity) and
 When updating versions, change ARGs in Dockerfile (lines 2–4). The workflow extracts these automatically:
 ```dockerfile
 ARG PG_VERSION=17.7
-ARG PGVECTOR_VERSION=0.8.1
+ARG PGVECTOR_VERSION=0.8.2
 ARG TIMESCALEDB_VERSION=2.25.0
 ```
 
@@ -64,7 +64,7 @@ docker exec <container> psql -U postgres -c "SELECT extname FROM pg_extension;"
 Tag each architecture separately **and** create a multi-arch manifest:
 - `17` — major version (also used as `latest`)
 - `17.7` — full PostgreSQL version
-- `full-17.7-pgv0.8.1-tsdb2.25.0` — complete version string with all components
+- `full-17.7-pgv0.8.2-tsdb2.25.0` — complete version string with all components
 - Architecture suffixes: `-amd64`, `-arm64` for platform-specific pulls
 
 ## Documentation Standards

@@ -22,7 +22,7 @@ on:
       pgvector_version:
         description: 'pgvector version'
         required: true
-        default: '0.8.1'
+        default: '0.8.2'
         type: string
       timescaledb_version:
         description: 'TimescaleDB version'
