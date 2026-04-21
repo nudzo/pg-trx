@@ -63,7 +63,7 @@ docker exec <container> psql -U postgres -c "SELECT extname FROM pg_extension;"
 
 Tag each architecture separately **and** create a multi-arch manifest:
 - `17` — major version (also used as `latest`)
-- `17.7` — full PostgreSQL version
+- `17.9` — full PostgreSQL version
 - `full-17.9-pgv0.8.2-tsdb2.26.3-sysstat3.2` — complete version string with all components
 - Architecture suffixes: `-amd64`, `-arm64` for platform-specific pulls
 
