@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     curl \
     git \
+    libicu-dev \
     libkrb5-dev \
     libssl-dev \
     postgresql-server-dev-17 \
